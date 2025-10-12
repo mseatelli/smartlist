@@ -1,0 +1,1318 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <title>SmartList - Assistant Courses</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+            background: #f3f4f6;
+            color: #111827;
+            overflow-x: hidden;
+        }
+        
+        .container {
+            max-width: 100%;
+            margin: 0 auto;
+        }
+        
+        /* Header */
+        .header {
+            background: white;
+            padding: 1rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        
+        .header-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+        
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+        
+        .nav {
+            display: flex;
+            gap: 0.5rem;
+            overflow-x: auto;
+            padding-bottom: 0.5rem;
+        }
+        
+        .nav-btn {
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 0.5rem;
+            background: #e5e7eb;
+            cursor: pointer;
+            white-space: nowrap;
+            font-size: 0.875rem;
+        }
+        
+        .nav-btn.active {
+            background: #3b82f6;
+            color: white;
+        }
+        
+        /* Buttons */
+        .btn {
+            padding: 0.75rem 1rem;
+            border: none;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.2s;
+        }
+        
+        .btn-primary {
+            background: #3b82f6;
+            color: white;
+        }
+        
+        .btn-primary:active {
+            background: #2563eb;
+        }
+        
+        .btn-success {
+            background: #22c55e;
+            color: white;
+        }
+        
+        .btn-danger {
+            background: #ef4444;
+            color: white;
+        }
+        
+        .btn-icon {
+            padding: 0.5rem;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 40px;
+            height: 40px;
+        }
+        
+        /* Main content */
+        .main {
+            padding: 1rem;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 1rem;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        
+        .card-title {
+            font-size: 1.25rem;
+            font-weight: bold;
+            margin-bottom: 1rem;
+        }
+        
+        /* Input */
+        .input {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #d1d5db;
+            border-radius: 0.5rem;
+            font-size: 1rem;
+        }
+        
+        .input-group {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+        
+        /* Items list */
+        .item {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 1rem;
+            background: #f9fafb;
+            border-radius: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .item.completed {
+            opacity: 0.6;
+        }
+        
+        .checkbox {
+            width: 24px;
+            height: 24px;
+            border: 2px solid #d1d5db;
+            border-radius: 50%;
+            cursor: pointer;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .checkbox.checked {
+            background: #3b82f6;
+            border-color: #3b82f6;
+        }
+        
+        .item-name {
+            flex: 1;
+        }
+        
+        .item-name.completed {
+            text-decoration: line-through;
+        }
+        
+        /* Categories */
+        .category-header {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: #6b7280;
+            margin: 1rem 0 0.5rem 0;
+        }
+        
+        /* Notifications */
+        .notification {
+            position: fixed;
+            top: 1rem;
+            right: 1rem;
+            background: white;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            z-index: 1000;
+            animation: slideIn 0.3s;
+        }
+        
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+            }
+            to {
+                transform: translateX(0);
+            }
+        }
+        
+        /* Dark mode */
+        body.dark {
+            background: #111827;
+            color: #f9fafb;
+        }
+        
+        body.dark .header,
+        body.dark .card {
+            background: #1f2937;
+        }
+        
+        body.dark .item {
+            background: #374151;
+        }
+        
+        body.dark .nav-btn {
+            background: #374151;
+            color: #f9fafb;
+        }
+        
+        body.dark .input {
+            background: #374151;
+            border-color: #4b5563;
+            color: #f9fafb;
+        }
+        
+        /* Splash screen */
+        .splash {
+            position: fixed;
+            inset: 0;
+            background: linear-gradient(to bottom right, #3b82f6, #8b5cf6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+        }
+        
+        .splash-content {
+            text-align: center;
+            color: white;
+        }
+        
+        .splash-logo {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+            animation: bounce 1s infinite;
+        }
+        
+        @keyframes bounce {
+            0%, 100% { transform: translateY(-10px); }
+            50% { transform: translateY(0); }
+        }
+        
+        /* Icons */
+        .icon {
+            width: 24px;
+            height: 24px;
+        }
+        
+        .icon-lg {
+            width: 48px;
+            height: 48px;
+        }
+        
+        /* Utilities */
+        .flex {
+            display: flex;
+        }
+        
+        .items-center {
+            align-items: center;
+        }
+        
+        .justify-between {
+            justify-content: space-between;
+        }
+        
+        .gap-2 {
+            gap: 0.5rem;
+        }
+        
+        .text-center {
+            text-align: center;
+        }
+        
+        .mt-2 {
+            margin-top: 0.5rem;
+        }
+        
+        .mb-2 {
+            margin-bottom: 0.5rem;
+        }
+        
+        .hidden {
+            display: none;
+        }
+        
+        /* Modal */
+        .modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            padding: 1rem;
+        }
+        
+        .modal-content {
+            background: white;
+            border-radius: 1rem;
+            padding: 1.5rem;
+            max-width: 500px;
+            width: 100%;
+        }
+        
+        body.dark .modal-content {
+            background: #1f2937;
+        }
+        
+        /* Voice indicator */
+        .voice-indicator {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            width: 60px;
+            height: 60px;
+            background: #ef4444;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+            animation: pulse 2s infinite;
+            z-index: 100;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 3rem 1rem;
+            color: #9ca3af;
+        }
+        
+        .theme-picker {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 0.75rem;
+        }
+        
+        .theme-option {
+            padding: 1rem;
+            border: 2px solid #e5e7eb;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            text-align: center;
+        }
+        
+        .theme-option.active {
+            border-color: #3b82f6;
+            background: #eff6ff;
+        }
+        
+        .theme-color {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            margin: 0 auto 0.5rem;
+        }
+        
+        /* Responsive */
+        @media (max-width: 640px) {
+            .header-top {
+                flex-wrap: wrap;
+            }
+            
+            .nav {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="app"></div>
+
+    <script>
+        // App state
+        const state = {
+            showSplash: true,
+            darkMode: false,
+            currentView: 'home',
+            items: [],
+            trash: [],
+            categories: ['Fruits & Légumes', 'Viande & Poisson', 'Produits laitiers', 'Épicerie', 'Hygiène', 'Autres'],
+            history: [],
+            favorites: [],
+            newItem: '',
+            notifications: [],
+            isListening: false,
+            currentTheme: 'blue',
+            showCategoryModal: false,
+            showShareModal: false,
+            showEditItemModal: false,
+            showEditCategoryModal: false,
+            newCategory: '',
+            shareCode: '',
+            editingItem: null,
+            editingCategory: null,
+            editCategoryNewName: ''
+        };
+
+        // Item database for auto-categorization
+        const itemsDB = {
+            'Fruits & Légumes': ['tomate', 'pomme', 'banane', 'carotte', 'oignon', 'salade', 'courgette', 'citron', 'orange', 'fraise', 'avocat'],
+            'Viande & Poisson': ['poulet', 'bœuf', 'porc', 'saumon', 'thon', 'jambon', 'saucisse'],
+            'Produits laitiers': ['lait', 'beurre', 'fromage', 'yaourt', 'crème', 'œuf'],
+            'Épicerie': ['riz', 'pâtes', 'farine', 'sucre', 'sel', 'huile', 'pain', 'café', 'thé'],
+            'Hygiène': ['savon', 'shampoing', 'dentifrice', 'papier toilette']
+        };
+
+        // Load saved data
+        function loadData() {
+            try {
+                const saved = localStorage.getItem('smartListData');
+                if (saved) {
+                    const data = JSON.parse(saved);
+                    state.items = data.items || [];
+                    state.categories = data.categories || state.categories;
+                    state.history = data.history || [];
+                    state.favorites = data.favorites || [];
+                    state.darkMode = data.darkMode || false;
+                    state.shareCode = data.shareCode || '';
+                }
+            } catch (e) {
+                console.error('Erreur chargement:', e);
+            }
+        }
+
+        // Save data
+        function saveData() {
+            try {
+                localStorage.setItem('smartListData', JSON.stringify({
+                    items: state.items,
+                    categories: state.categories,
+                    history: state.history,
+                    favorites: state.favorites,
+                    darkMode: state.darkMode,
+                    shareCode: state.shareCode
+                }));
+            } catch (e) {
+                console.error('Erreur sauvegarde:', e);
+            }
+        }
+
+        // Auto-categorize item
+        function getCategory(itemName) {
+            const lower = itemName.toLowerCase();
+            for (const [cat, keywords] of Object.entries(itemsDB)) {
+                if (keywords.some(k => lower.includes(k) || k.includes(lower))) {
+                    return cat;
+                }
+            }
+            return 'Autres';
+        }
+
+        // Escape HTML to prevent XSS and quote issues
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Escape for use in HTML attributes
+        function escapeAttr(text) {
+            return text.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        }
+
+        // Add item
+        function addItem(name) {
+            if (!name || !name.trim()) return;
+            
+            const item = {
+                id: Date.now() + Math.random(), // ID unique même si ajout rapide
+                name: name.trim(),
+                category: getCategory(name),
+                completed: false,
+                dateAdded: new Date().toISOString()
+            };
+            
+            state.items.push(item);
+            state.newItem = '';
+            saveData();
+            showNotification(`"${escapeHtml(name)}" ajouté dans ${item.category}`);
+            render();
+        }
+
+        // Toggle item
+        function toggleItem(id) {
+            const item = state.items.find(i => i.id === id);
+            if (item) {
+                item.completed = !item.completed;
+                saveData();
+                render();
+            }
+        }
+
+        // Remove item
+        function removeItem(id) {
+            state.items = state.items.filter(i => i.id !== id);
+            saveData();
+            showNotification('Article supprimé');
+            render();
+        }
+
+        // Show notification
+        function showNotification(message) {
+            const notif = { id: Date.now(), message };
+            state.notifications.push(notif);
+            render();
+            
+            setTimeout(() => {
+                state.notifications = state.notifications.filter(n => n.id !== notif.id);
+                render();
+            }, 3000);
+        }
+
+        // Toggle dark mode
+        function toggleDarkMode() {
+            state.darkMode = !state.darkMode;
+            document.body.className = state.darkMode ? 'dark' : '';
+            saveData();
+            render();
+        }
+
+        // Change view
+        function changeView(view) {
+            state.currentView = view;
+            render();
+        }
+
+        // Save to history
+        function saveToHistory() {
+            if (state.items.length === 0) return;
+            
+            state.history.unshift({
+                id: Date.now(),
+                date: new Date().toISOString(),
+                items: [...state.items],
+                total: state.items.length
+            });
+            
+            state.history = state.history.slice(0, 10);
+            state.items = [];
+            saveData();
+            showNotification('Liste sauvegardée dans l\'historique');
+            render();
+        }
+
+        // Voice recognition with better error handling
+        let recognition = null;
+        
+        function initVoice() {
+            if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                recognition = new SpeechRecognition();
+                recognition.lang = 'fr-FR';
+                recognition.continuous = false;
+                recognition.interimResults = false;
+                
+                recognition.onresult = (e) => {
+                    const text = e.results[0][0].transcript;
+                    if (text.toLowerCase().includes('ajouter') || text.toLowerCase().includes('ajoute')) {
+                        const item = text.replace(/ajouter|ajoute/gi, '').trim();
+                        if (item) addItem(item);
+                    } else {
+                        addItem(text);
+                    }
+                };
+                
+                recognition.onerror = (e) => {
+                    console.error('Erreur reconnaissance:', e.error);
+                    state.isListening = false;
+                    if (e.error === 'not-allowed' || e.error === 'permission-denied') {
+                        showNotification('Autorisez l\'accès au microphone dans les paramètres');
+                    } else if (e.error === 'no-speech') {
+                        showNotification('Aucune voix détectée');
+                    } else {
+                        showNotification('Erreur microphone: ' + e.error);
+                    }
+                    render();
+                };
+                
+                recognition.onend = () => {
+                    state.isListening = false;
+                    render();
+                };
+            }
+        }
+
+        function toggleListening() {
+            if (!recognition) {
+                showNotification('Reconnaissance vocale non disponible sur ce navigateur');
+                return;
+            }
+            
+            if (state.isListening) {
+                try {
+                    recognition.stop();
+                    state.isListening = false;
+                } catch (e) {
+                    console.error('Erreur arrêt:', e);
+                }
+            } else {
+                try {
+                    recognition.start();
+                    state.isListening = true;
+                    showNotification('Parlez maintenant...');
+                } catch (e) {
+                    console.error('Erreur démarrage:', e);
+                    showNotification('Impossible de démarrer le microphone');
+                    state.isListening = false;
+                }
+            }
+            render();
+        }
+
+        // Render functions
+        function renderHeader() {
+            return `
+                <div class="header">
+                    <div class="header-top">
+                        <div class="logo">
+                            🛒 SmartList
+                        </div>
+                        <div class="flex gap-2">
+                            <button class="btn btn-icon" onclick="toggleDarkMode()" style="background: #e5e7eb;">
+                                ${state.darkMode ? '☀️' : '🌙'}
+                            </button>
+                            <button class="btn btn-icon ${state.isListening ? 'btn-danger' : 'btn-primary'}" onclick="toggleListening()">
+                                🎤
+                            </button>
+                        </div>
+                    </div>
+                    <div class="nav">
+                        ${['home', 'history', 'categories', 'favorites', 'share', 'settings'].map(view => `
+                            <button class="nav-btn ${state.currentView === view ? 'active' : ''}" 
+                                    onclick="changeView('${view}')">
+                                ${getViewName(view)}
+                            </button>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        function getViewName(view) {
+            const names = {
+                home: '🏠 Accueil',
+                history: '📚 Historique',
+                categories: '🏷️ Catégories',
+                favorites: '⭐ Favoris',
+                share: '🔗 Partager',
+                settings: '⚙️ Paramètres'
+            };
+            return names[view] || view;
+        }
+
+        function renderHomeView() {
+            const itemsByCategory = {};
+            
+            // Initialiser toutes les catégories
+            state.categories.forEach(cat => {
+                itemsByCategory[cat] = [];
+            });
+            
+            // Grouper les articles par catégorie
+            state.items.forEach(item => {
+                // Si la catégorie n'existe pas, créer "Autres"
+                if (!itemsByCategory[item.category]) {
+                    itemsByCategory['Autres'] = itemsByCategory['Autres'] || [];
+                    itemsByCategory['Autres'].push(item);
+                } else {
+                    itemsByCategory[item.category].push(item);
+                }
+            });
+
+            return `
+                <div class="card">
+                    <div class="card-title">Ajouter un article</div>
+                    <div class="input-group">
+                        <input type="text" 
+                               class="input" 
+                               placeholder="Nom de l'article..." 
+                               value="${state.newItem}"
+                               onkeypress="if(event.key==='Enter')addItem(this.value)"
+                               oninput="state.newItem=this.value">
+                        <button class="btn btn-primary" onclick="addItem(state.newItem)">
+                            ➕
+                        </button>
+                    </div>
+                    ${state.newItem ? `<div class="mt-2" style="font-size: 0.875rem; color: #6b7280;">
+                        Catégorie: ${getCategory(state.newItem)}
+                    </div>` : ''}
+                </div>
+
+                <div class="card">
+                    <div class="flex items-center justify-between mb-2">
+                        <div class="card-title" style="margin: 0;">
+                            Ma liste (${state.items.filter(i => !i.completed).length}/${state.items.length})
+                        </div>
+                        ${state.items.length > 0 ? `
+                            <button class="btn btn-success" onclick="saveToHistory()">
+                                ✓ Terminer
+                            </button>
+                        ` : ''}
+                    </div>
+
+                    ${state.items.length === 0 ? `
+                        <div class="empty-state">
+                            <div style="font-size: 3rem; margin-bottom: 1rem;">🛒</div>
+                            <div style="font-size: 1.125rem; margin-bottom: 0.5rem;">Votre liste est vide</div>
+                            <div style="font-size: 0.875rem;">Ajoutez des articles ou utilisez la commande vocale</div>
+                        </div>
+                    ` : `
+                        ${state.categories.map(category => {
+                            const items = itemsByCategory[category] || [];
+                            if (items.length === 0) return '';
+                            
+                            return `
+                                <div class="category-header">${escapeHtml(category)} (${items.length})</div>
+                                ${items.map(item => `
+                                    <div class="item ${item.completed ? 'completed' : ''}">
+                                        <div class="checkbox ${item.completed ? 'checked' : ''}" 
+                                             onclick="toggleItem(${item.id})">
+                                            ${item.completed ? '✓' : ''}
+                                        </div>
+                                        <div class="item-name ${item.completed ? 'completed' : ''}" 
+                                             onclick="openEditItemModal(${item.id})"
+                                             style="cursor: pointer;">
+                                            ${escapeHtml(item.name)}
+                                            <div style="font-size: 0.75rem; color: #6b7280; margin-top: 0.25rem;">
+                                                📁 ${escapeHtml(item.category)}
+                                            </div>
+                                        </div>
+                                        <button class="btn btn-icon btn-danger" 
+                                                onclick="removeItem(${item.id})"
+                                                style="width: 32px; height: 32px; font-size: 1rem;">
+                                            🗑️
+                                        </button>
+                                    </div>
+                                `).join('')}
+                            `;
+                        }).join('')}
+                    `}
+                </div>
+            `;
+        }
+
+        function renderHistoryView() {
+            return `
+                <div class="card">
+                    <div class="card-title">Historique des courses</div>
+                    ${state.history.length === 0 ? `
+                        <div class="empty-state">
+                            <div style="font-size: 3rem; margin-bottom: 1rem;">📚</div>
+                            <div style="font-size: 1.125rem;">Aucun historique</div>
+                        </div>
+                    ` : state.history.map(record => `
+                        <div class="item">
+                            <div style="flex: 1;">
+                                <div style="font-weight: 600; margin-bottom: 0.25rem;">
+                                    ${new Date(record.date).toLocaleDateString('fr-FR', {
+                                        day: '2-digit',
+                                        month: '2-digit',
+                                        year: 'numeric'
+                                    })}
+                                </div>
+                                <div style="font-size: 0.875rem; color: #6b7280;">
+                                    ${record.total} articles
+                                </div>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }
+
+        function renderCategoriesView() {
+            return `
+                <div class="card">
+                    <div class="flex items-center justify-between mb-2">
+                        <div class="card-title" style="margin: 0;">Catégories</div>
+                        <button class="btn btn-primary" onclick="state.showCategoryModal=true; render();">
+                            ➕ Nouvelle
+                        </button>
+                    </div>
+                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.75rem;">
+                        ${state.categories.map(cat => `
+                            <div style="padding: 1rem; background: ${state.darkMode ? '#374151' : '#f9fafb'}; border-radius: 0.5rem; position: relative;">
+                                <div style="text-align: center;">
+                                    <div style="font-size: 2rem; margin-bottom: 0.5rem;">🏷️</div>
+                                    <div style="font-weight: 600; margin-bottom: 0.25rem;">${escapeHtml(cat)}</div>
+                                    <div style="font-size: 0.75rem; color: #6b7280;">
+                                        ${state.items.filter(i => i.category === cat).length} articles
+                                    </div>
+                                </div>
+                                <div style="display: flex; gap: 0.25rem; margin-top: 0.5rem; justify-content: center;">
+                                    <button onclick="openEditCategoryModal('${escapeAttr(cat)}')" 
+                                            style="padding: 0.25rem 0.5rem; background: #3b82f6; color: white; border: none; border-radius: 0.25rem; font-size: 0.75rem; cursor: pointer;">
+                                        ✏️ Modifier
+                                    </button>
+                                    ${cat !== 'Autres' ? `
+                                        <button onclick="deleteCategory('${escapeAttr(cat)}')" 
+                                                style="padding: 0.25rem 0.5rem; background: #ef4444; color: white; border: none; border-radius: 0.25rem; font-size: 0.75rem; cursor: pointer;">
+                                            🗑️
+                                        </button>
+                                    ` : ''}
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                    <div class="mt-2" style="padding: 1rem; background: ${state.darkMode ? '#065f46' : '#dcfce7'}; border-radius: 0.5rem; margin-top: 1rem;">
+                        <div style="font-weight: 600; margin-bottom: 0.5rem;">🧠 Classification automatique</div>
+                        <div style="font-size: 0.875rem; color: ${state.darkMode ? '#d1fae5' : '#166534'};">
+                            Les articles sont automatiquement classés dans la bonne catégorie !
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderFavoritesView() {
+            return `
+                <div class="card">
+                    <div class="card-title">Favoris</div>
+                    ${state.favorites.length === 0 ? `
+                        <div class="empty-state">
+                            <div style="font-size: 3rem; margin-bottom: 1rem;">⭐</div>
+                            <div style="font-size: 1.125rem;">Aucun favori</div>
+                        </div>
+                    ` : state.favorites.map(fav => `
+                        <div class="item">
+                            <div style="flex: 1;">⭐ ${fav}</div>
+                            <button class="btn btn-primary" onclick="addItem('${fav}')">
+                                Ajouter
+                            </button>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }
+
+        function renderSettingsView() {
+            return `
+                <div class="card">
+                    <div class="card-title">Export / Import</div>
+                    <button class="btn btn-primary" onclick="exportData()" style="width: 100%; margin-bottom: 0.5rem;">
+                        💾 Exporter la liste
+                    </button>
+                    <label class="btn btn-primary" style="width: 100%; display: block; text-align: center; cursor: pointer;">
+                        📁 Importer une liste
+                        <input type="file" accept=".json" onchange="importData(event)" style="display: none;">
+                    </label>
+                </div>
+
+                <div class="card">
+                    <div class="card-title">Mode sombre</div>
+                    <div class="flex items-center justify-between">
+                        <span>Thème sombre</span>
+                        <button class="btn ${state.darkMode ? 'btn-primary' : ''}" 
+                                onclick="toggleDarkMode()"
+                                style="padding: 0.5rem 1rem;">
+                            ${state.darkMode ? 'Activé' : 'Désactivé'}
+                        </button>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-title">Debug & Maintenance</div>
+                    <div style="margin-bottom: 1rem; padding: 0.75rem; background: ${state.darkMode ? '#374151' : '#f3f4f6'}; border-radius: 0.5rem; font-size: 0.875rem;">
+                        <div><strong>Articles en mémoire:</strong> ${state.items.length}</div>
+                        <div><strong>Catégories:</strong> ${state.categories.length}</div>
+                        <div><strong>Historique:</strong> ${state.history.length} listes</div>
+                    </div>
+                    <button class="btn btn-danger" onclick="if(confirm('Effacer toutes les données?'))clearAllData()" style="width: 100%;">
+                        🗑️ Réinitialiser l'application
+                    </button>
+                </div>
+            `;
+        }
+
+        function clearAllData() {
+            localStorage.removeItem('smartListData');
+            state.items = [];
+            state.categories = ['Fruits & Légumes', 'Viande & Poisson', 'Produits laitiers', 'Épicerie', 'Hygiène', 'Autres'];
+            state.history = [];
+            state.favorites = [];
+            state.shareCode = '';
+            showNotification('Application réinitialisée');
+            render();
+        }
+
+        function renderShareView() {
+            return `
+                <div class="card">
+                    <div class="card-title">Partager ma liste</div>
+                    <button class="btn btn-primary" onclick="generateShareCode()" style="width: 100%; margin-bottom: 1rem;">
+                        🔗 Générer un code de partage
+                    </button>
+                    
+                    ${state.shareCode ? `
+                        <div style="padding: 1rem; background: ${state.darkMode ? '#374151' : '#f3f4f6'}; border-radius: 0.5rem; margin-bottom: 1rem;">
+                            <div style="font-weight: 600; margin-bottom: 0.5rem;">Code de partage :</div>
+                            <div style="font-size: 1.5rem; font-family: monospace; text-align: center; padding: 1rem; background: ${state.darkMode ? '#1f2937' : 'white'}; border-radius: 0.5rem; letter-spacing: 0.2rem;">
+                                ${state.shareCode}
+                            </div>
+                            <div style="font-size: 0.875rem; color: #6b7280; margin-top: 0.5rem; text-align: center;">
+                                Partagez ce code pour donner accès à votre liste
+                            </div>
+                        </div>
+                    ` : ''}
+                    
+                    <div style="border-top: 1px solid ${state.darkMode ? '#374151' : '#e5e7eb'}; padding-top: 1rem; margin-top: 1rem;">
+                        <div style="font-weight: 600; margin-bottom: 0.5rem;">Rejoindre une liste</div>
+                        <div class="input-group">
+                            <input type="text" 
+                                   class="input" 
+                                   placeholder="Entrez un code..." 
+                                   id="joinCode">
+                            <button class="btn btn-success" onclick="joinSharedList()">
+                                Rejoindre
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div style="padding: 1rem; background: ${state.darkMode ? '#1e3a8a' : '#dbeafe'}; border-radius: 0.5rem; margin-top: 1rem;">
+                        <div style="font-weight: 600; margin-bottom: 0.5rem;">ℹ️ Comment ça marche ?</div>
+                        <ul style="font-size: 0.875rem; color: ${state.darkMode ? '#bfdbfe' : '#1e40af'}; padding-left: 1.5rem;">
+                            <li>Générez un code pour partager votre liste</li>
+                            <li>La personne peut consulter votre liste avec ce code</li>
+                            <li>Le code reste valide jusqu'à ce que vous en génériez un nouveau</li>
+                        </ul>
+                    </div>
+                </div>
+            `;
+        }
+
+        function generateShareCode() {
+            state.shareCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+            saveData();
+            showNotification(`Code généré: ${state.shareCode}`);
+            render();
+        }
+
+        function joinSharedList() {
+            const code = document.getElementById('joinCode').value.trim().toUpperCase();
+            if (!code) {
+                showNotification('Veuillez entrer un code');
+                return;
+            }
+            
+            // Simulation - dans une vraie app, cela contacterait un serveur
+            showNotification('Fonctionnalité disponible avec synchronisation serveur');
+        }
+
+        function addNewCategory() {
+            if (!state.newCategory.trim()) {
+                showNotification('Entrez un nom de catégorie');
+                return;
+            }
+            
+            if (state.categories.includes(state.newCategory.trim())) {
+                showNotification('Cette catégorie existe déjà');
+                return;
+            }
+            
+            state.categories.push(state.newCategory.trim());
+            state.newCategory = '';
+            state.showCategoryModal = false;
+            saveData();
+            showNotification('Catégorie ajoutée');
+            render();
+        }
+
+        function openEditItemModal(id) {
+            state.editingItem = state.items.find(i => i.id === id);
+            state.showEditItemModal = true;
+            render();
+        }
+
+        function updateItem() {
+            if (!state.editingItem) return;
+            
+            const nameInput = document.getElementById('editItemName');
+            const categorySelect = document.getElementById('editItemCategory');
+            
+            if (!nameInput || !categorySelect) return;
+            
+            const item = state.items.find(i => i.id === state.editingItem.id);
+            if (item) {
+                item.name = nameInput.value.trim();
+                item.category = categorySelect.value;
+                saveData();
+                showNotification('Article modifié');
+            }
+            
+            state.showEditItemModal = false;
+            state.editingItem = null;
+            render();
+        }
+
+        function openEditCategoryModal(category) {
+            state.editingCategory = category;
+            state.editCategoryNewName = category;
+            state.showEditCategoryModal = true;
+            render();
+        }
+
+        function updateCategory() {
+            if (!state.editingCategory || !state.editCategoryNewName.trim()) {
+                showNotification('Entrez un nom de catégorie');
+                return;
+            }
+            
+            const newName = state.editCategoryNewName.trim();
+            const oldName = state.editingCategory;
+            
+            if (newName !== oldName && state.categories.includes(newName)) {
+                showNotification('Cette catégorie existe déjà');
+                return;
+            }
+            
+            // Mettre à jour le nom de la catégorie
+            const index = state.categories.indexOf(oldName);
+            if (index !== -1) {
+                state.categories[index] = newName;
+            }
+            
+            // Mettre à jour tous les articles avec cette catégorie
+            state.items.forEach(item => {
+                if (item.category === oldName) {
+                    item.category = newName;
+                }
+            });
+            
+            state.showEditCategoryModal = false;
+            state.editingCategory = null;
+            state.editCategoryNewName = '';
+            saveData();
+            showNotification('Catégorie modifiée');
+            render();
+        }
+
+        function deleteCategory(category) {
+            if (category === 'Autres') {
+                showNotification('Impossible de supprimer la catégorie "Autres"');
+                return;
+            }
+            
+            if (!confirm(`Supprimer la catégorie "${category}"?\nLes articles seront déplacés vers "Autres".`)) {
+                return;
+            }
+            
+            // Déplacer les articles vers "Autres"
+            state.items.forEach(item => {
+                if (item.category === category) {
+                    item.category = 'Autres';
+                }
+            });
+            
+            // Supprimer la catégorie
+            state.categories = state.categories.filter(c => c !== category);
+            
+            saveData();
+            showNotification('Catégorie supprimée');
+            render();
+        }
+
+        function renderNotifications() {
+            return state.notifications.map(n => `
+                <div class="notification">${n.message}</div>
+            `).join('');
+        }
+
+        // Export/Import
+        function exportData() {
+            try {
+                const data = JSON.stringify({
+                    items: state.items,
+                    categories: state.categories,
+                    favorites: state.favorites,
+                    exportDate: new Date().toISOString()
+                }, null, 2);
+                
+                const blob = new Blob([data], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `smartlist_${new Date().toISOString().split('T')[0]}.json`;
+                a.click();
+                URL.revokeObjectURL(url);
+                
+                showNotification('Liste exportée');
+            } catch (e) {
+                showNotification('Erreur export');
+            }
+        }
+
+        function importData(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    if (data.items) state.items = [...state.items, ...data.items];
+                    if (data.categories) state.categories = [...new Set([...state.categories, ...data.categories])];
+                    if (data.favorites) state.favorites = [...new Set([...state.favorites, ...data.favorites])];
+                    saveData();
+                    showNotification('Liste importée');
+                    render();
+                } catch (e) {
+                    showNotification('Erreur import');
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        // Main render
+        function render() {
+            const app = document.getElementById('app');
+            
+            if (state.showSplash) {
+                app.innerHTML = `
+                    <div class="splash">
+                        <div class="splash-content">
+                            <div class="splash-logo">🛒</div>
+                            <h1 style="font-size: 2rem; font-weight: bold; margin-bottom: 0.5rem;">SmartList</h1>
+                            <p style="font-size: 1.125rem; opacity: 0.9;">Votre assistant courses intelligent</p>
+                        </div>
+                    </div>
+                `;
+                return;
+            }
+            
+            let content = '';
+            switch (state.currentView) {
+                case 'home': content = renderHomeView(); break;
+                case 'history': content = renderHistoryView(); break;
+                case 'categories': content = renderCategoriesView(); break;
+                case 'favorites': content = renderFavoritesView(); break;
+                case 'share': content = renderShareView(); break;
+                case 'settings': content = renderSettingsView(); break;
+            }
+            
+            app.innerHTML = `
+                ${renderHeader()}
+                <div class="main">
+                    ${content}
+                </div>
+                ${renderNotifications()}
+                ${state.isListening ? '<div class="voice-indicator">🎤</div>' : ''}
+                ${state.showCategoryModal ? renderCategoryModal() : ''}
+                ${state.showEditItemModal ? renderEditItemModal() : ''}
+                ${state.showEditCategoryModal ? renderEditCategoryModal() : ''}
+            `;
+        }
+
+        function renderCategoryModal() {
+            return `
+                <div class="modal" onclick="if(event.target===this){state.showCategoryModal=false;render();}">
+                    <div class="modal-content">
+                        <div class="card-title">Nouvelle catégorie</div>
+                        <input type="text" 
+                               class="input" 
+                               placeholder="Nom de la catégorie..."
+                               value="${state.newCategory}"
+                               oninput="state.newCategory=this.value"
+                               onkeypress="if(event.key==='Enter')addNewCategory()"
+                               style="margin-bottom: 1rem;">
+                        <div class="flex gap-2">
+                            <button class="btn" 
+                                    onclick="state.showCategoryModal=false; state.newCategory=''; render();"
+                                    style="flex: 1; background: #e5e7eb;">
+                                Annuler
+                            </button>
+                            <button class="btn btn-primary" 
+                                    onclick="addNewCategory()"
+                                    style="flex: 1;">
+                                Ajouter
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderEditItemModal() {
+            if (!state.editingItem) return '';
+            
+            return `
+                <div class="modal" onclick="if(event.target===this){state.showEditItemModal=false;state.editingItem=null;render();}">
+                    <div class="modal-content">
+                        <div class="card-title">Modifier l'article</div>
+                        
+                        <div style="margin-bottom: 1rem;">
+                            <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Nom:</label>
+                            <input type="text" 
+                                   id="editItemName"
+                                   class="input" 
+                                   value="${escapeAttr(state.editingItem.name)}"
+                                   placeholder="Nom de l'article...">
+                        </div>
+                        
+                        <div style="margin-bottom: 1rem;">
+                            <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Catégorie:</label>
+                            <select id="editItemCategory" class="input">
+                                ${state.categories.map(cat => `
+                                    <option value="${escapeAttr(cat)}" ${state.editingItem.category === cat ? 'selected' : ''}>
+                                        ${escapeHtml(cat)}
+                                    </option>
+                                `).join('')}
+                            </select>
+                        </div>
+                        
+                        <div class="flex gap-2">
+                            <button class="btn" 
+                                    onclick="state.showEditItemModal=false; state.editingItem=null; render();"
+                                    style="flex: 1; background: #e5e7eb;">
+                                Annuler
+                            </button>
+                            <button class="btn btn-primary" 
+                                    onclick="updateItem()"
+                                    style="flex: 1;">
+                                Enregistrer
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderEditCategoryModal() {
+            if (!state.editingCategory) return '';
+            
+            return `
+                <div class="modal" onclick="if(event.target===this){state.showEditCategoryModal=false;state.editingCategory=null;render();}">
+                    <div class="modal-content">
+                        <div class="card-title">Modifier la catégorie</div>
+                        
+                        <div style="margin-bottom: 1rem;">
+                            <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Nouveau nom:</label>
+                            <input type="text" 
+                                   class="input" 
+                                   value="${escapeAttr(state.editCategoryNewName)}"
+                                   oninput="state.editCategoryNewName=this.value"
+                                   onkeypress="if(event.key==='Enter')updateCategory()"
+                                   placeholder="Nom de la catégorie...">
+                        </div>
+                        
+                        <div style="padding: 0.75rem; background: ${state.darkMode ? '#1e3a8a' : '#dbeafe'}; border-radius: 0.5rem; margin-bottom: 1rem; font-size: 0.875rem;">
+                            ℹ️ Les articles de cette catégorie seront automatiquement mis à jour.
+                        </div>
+                        
+                        <div class="flex gap-2">
+                            <button class="btn" 
+                                    onclick="state.showEditCategoryModal=false; state.editingCategory=null; render();"
+                                    style="flex: 1; background: #e5e7eb;">
+                                Annuler
+                            </button>
+                            <button class="btn btn-primary" 
+                                    onclick="updateCategory()"
+                                    style="flex: 1;">
+                                Enregistrer
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Initialize
+        loadData();
+        if (state.darkMode) document.body.className = 'dark';
+        initVoice();
+        render();
+
+        setTimeout(() => {
+            state.showSplash = false;
+            render();
+        }, 3000);
+    </script>
+</body>
+</html>
