@@ -420,26 +420,32 @@
             newItem: '',
             notifications: [],
             isListening: false,
-            currentTheme: 'blue',
             showCategoryModal: false,
-            showShareModal: false,
             showEditItemModal: false,
-            showEditCategoryModal: false,
             newCategory: '',
             shareCode: '',
-            editingItem: null,
-            editingCategory: null,
-            editCategoryNewName: ''
+            editingItem: null
         };
 
         // Item database for auto-categorization
         const itemsDB = {
-            'Fruits & Légumes': ['tomate', 'pomme', 'banane', 'carotte', 'oignon', 'salade', 'courgette', 'citron', 'orange', 'fraise', 'avocat'],
+            'Fruits & Légumes': ['tomate', 'pomme', 'banane', 'carotte', 'oignon', 'salade', 'courgette', 'citron', 'orange', 'fraise', 'avocat', 'pain des fleurs'],
             'Viande & Poisson': ['poulet', 'bœuf', 'porc', 'saumon', 'thon', 'jambon', 'saucisse'],
             'Produits laitiers': ['lait', 'beurre', 'fromage', 'yaourt', 'crème', 'œuf'],
             'Épicerie': ['riz', 'pâtes', 'farine', 'sucre', 'sel', 'huile', 'pain', 'café', 'thé'],
             'Hygiène': ['savon', 'shampoing', 'dentifrice', 'papier toilette']
         };
+
+        // Escape HTML
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function escapeAttr(text) {
+            return text.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        }
 
         // Load saved data
         function loadData() {
@@ -448,6 +454,7 @@
                 if (saved) {
                     const data = JSON.parse(saved);
                     state.items = data.items || [];
+                    state.trash = data.trash || [];
                     state.categories = data.categories || state.categories;
                     state.history = data.history || [];
                     state.favorites = data.favorites || [];
@@ -464,6 +471,7 @@
             try {
                 localStorage.setItem('smartListData', JSON.stringify({
                     items: state.items,
+                    trash: state.trash,
                     categories: state.categories,
                     history: state.history,
                     favorites: state.favorites,
@@ -486,24 +494,12 @@
             return 'Autres';
         }
 
-        // Escape HTML to prevent XSS and quote issues
-        function escapeHtml(text) {
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
-        }
-
-        // Escape for use in HTML attributes
-        function escapeAttr(text) {
-            return text.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-        }
-
         // Add item
         function addItem(name) {
             if (!name || !name.trim()) return;
             
             const item = {
-                id: Date.now() + Math.random(), // ID unique même si ajout rapide
+                id: Date.now() + Math.random(),
                 name: name.trim(),
                 category: getCategory(name),
                 completed: false,
@@ -527,12 +523,47 @@
             }
         }
 
-        // Remove item
+        // Remove item (move to trash)
         function removeItem(id) {
-            state.items = state.items.filter(i => i.id !== id);
-            saveData();
-            showNotification('Article supprimé');
-            render();
+            const item = state.items.find(i => i.id === id);
+            if (item) {
+                state.trash.push({
+                    ...item,
+                    deletedAt: new Date().toISOString()
+                });
+                state.trash = state.trash.slice(-50);
+                state.items = state.items.filter(i => i.id !== id);
+                saveData();
+                showNotification(`"${escapeHtml(item.name)}" dans la corbeille`);
+                render();
+            }
+        }
+
+        // Restore item from trash
+        function restoreItem(id) {
+            const item = state.trash.find(i => i.id === id);
+            if (item) {
+                const { deletedAt, ...restoredItem } = item;
+                state.items.push(restoredItem);
+                state.trash = state.trash.filter(i => i.id !== id);
+                saveData();
+                showNotification(`"${escapeHtml(item.name)}" restauré`);
+                render();
+            }
+        }
+
+        // Empty trash
+        function emptyTrash() {
+            if (state.trash.length === 0) {
+                showNotification('La corbeille est vide');
+                return;
+            }
+            if (confirm(`Vider définitivement la corbeille (${state.trash.length} articles) ?`)) {
+                state.trash = [];
+                saveData();
+                showNotification('Corbeille vidée');
+                render();
+            }
         }
 
         // Show notification
@@ -579,7 +610,7 @@
             render();
         }
 
-        // Voice recognition with better error handling
+        // Voice recognition
         let recognition = null;
         
         function initVoice() {
@@ -604,7 +635,7 @@
                     console.error('Erreur reconnaissance:', e.error);
                     state.isListening = false;
                     if (e.error === 'not-allowed' || e.error === 'permission-denied') {
-                        showNotification('Autorisez l\'accès au microphone dans les paramètres');
+                        showNotification('Autorisez l\'accès au microphone');
                     } else if (e.error === 'no-speech') {
                         showNotification('Aucune voix détectée');
                     } else {
@@ -622,7 +653,7 @@
 
         function toggleListening() {
             if (!recognition) {
-                showNotification('Reconnaissance vocale non disponible sur ce navigateur');
+                showNotification('Reconnaissance vocale non disponible');
                 return;
             }
             
@@ -647,6 +678,68 @@
             render();
         }
 
+        // Open edit item modal
+        function openEditItemModal(id) {
+            state.editingItem = state.items.find(i => i.id === id);
+            state.showEditItemModal = true;
+            render();
+        }
+
+        // Update item
+        function updateItem() {
+            if (!state.editingItem) return;
+            
+            const nameInput = document.getElementById('editItemName');
+            const categorySelect = document.getElementById('editItemCategory');
+            
+            if (!nameInput || !categorySelect) return;
+            
+            const item = state.items.find(i => i.id === state.editingItem.id);
+            if (item) {
+                item.name = nameInput.value.trim();
+                item.category = categorySelect.value;
+                saveData();
+                showNotification('Article modifié');
+            }
+            
+            state.showEditItemModal = false;
+            state.editingItem = null;
+            render();
+        }
+
+        // Add category
+        function addNewCategory() {
+            if (!state.newCategory.trim()) {
+                showNotification('Entrez un nom de catégorie');
+                return;
+            }
+            
+            if (state.categories.includes(state.newCategory.trim())) {
+                showNotification('Cette catégorie existe déjà');
+                return;
+            }
+            
+            state.categories.push(state.newCategory.trim());
+            state.newCategory = '';
+            state.showCategoryModal = false;
+            saveData();
+            showNotification('Catégorie ajoutée');
+            render();
+        }
+
+        // Get time ago
+        function getTimeAgo(dateString) {
+            const now = new Date();
+            const date = new Date(dateString);
+            const seconds = Math.floor((now - date) / 1000);
+            
+            if (seconds < 60) return 'à l\'instant';
+            if (seconds < 3600) return `il y a ${Math.floor(seconds / 60)} min`;
+            if (seconds < 86400) return `il y a ${Math.floor(seconds / 3600)} h`;
+            if (seconds < 604800) return `il y a ${Math.floor(seconds / 86400)} j`;
+            return date.toLocaleDateString('fr-FR');
+        }
+
         // Render functions
         function renderHeader() {
             return `
@@ -665,7 +758,7 @@
                         </div>
                     </div>
                     <div class="nav">
-                        ${['home', 'history', 'categories', 'favorites', 'share', 'settings'].map(view => `
+                        ${['home', 'trash', 'history', 'categories', 'favorites', 'share', 'settings'].map(view => `
                             <button class="nav-btn ${state.currentView === view ? 'active' : ''}" 
                                     onclick="changeView('${view}')">
                                 ${getViewName(view)}
@@ -679,6 +772,7 @@
         function getViewName(view) {
             const names = {
                 home: '🏠 Accueil',
+                trash: '🗑️ Corbeille',
                 history: '📚 Historique',
                 categories: '🏷️ Catégories',
                 favorites: '⭐ Favoris',
@@ -691,14 +785,11 @@
         function renderHomeView() {
             const itemsByCategory = {};
             
-            // Initialiser toutes les catégories
             state.categories.forEach(cat => {
                 itemsByCategory[cat] = [];
             });
             
-            // Grouper les articles par catégorie
             state.items.forEach(item => {
-                // Si la catégorie n'existe pas, créer "Autres"
                 if (!itemsByCategory[item.category]) {
                     itemsByCategory['Autres'] = itemsByCategory['Autres'] || [];
                     itemsByCategory['Autres'].push(item);
@@ -779,10 +870,54 @@
             `;
         }
 
+        function renderTrashView() {
+            return `
+                <div class="card">
+                    <div class="flex items-center justify-between mb-2">
+                        <div class="card-title" style="margin: 0;">
+                            Corbeille (${state.trash.length})
+                        </div>
+                        ${state.trash.length > 0 ? `
+                            <button class="btn btn-danger" onclick="emptyTrash()" style="font-size: 0.875rem; padding: 0.5rem 1rem;">
+                                🗑️ Vider
+                            </button>
+                        ` : ''}
+                    </div>
+                    
+                    ${state.trash.length === 0 ? `
+                        <div class="empty-state">
+                            <div style="font-size: 3rem; margin-bottom: 1rem;">🗑️</div>
+                            <div style="font-size: 1.125rem; margin-bottom: 0.5rem;">Corbeille vide</div>
+                            <div style="font-size: 0.875rem;">Les articles supprimés apparaîtront ici</div>
+                        </div>
+                    ` : state.trash.map(item => `
+                        <div class="item">
+                            <div style="flex: 1;">
+                                <div style="font-weight: 600;">${escapeHtml(item.name)}</div>
+                                <div style="font-size: 0.75rem; color: #6b7280; margin-top: 0.25rem;">
+                                    📁 ${escapeHtml(item.category)} • Supprimé ${getTimeAgo(item.deletedAt)}
+                                </div>
+                            </div>
+                            <button class="btn btn-success" onclick="restoreItem(${item.id})" style="padding: 0.5rem 1rem; font-size: 0.875rem;">
+                                ↩️ Restaurer
+                            </button>
+                        </div>
+                    `).join('')}
+                    
+                    ${state.trash.length > 0 ? `
+                        <div class="mt-2" style="padding: 0.75rem; background: ${state.darkMode ? '#1e3a8a' : '#dbeafe'}; border-radius: 0.5rem; margin-top: 1rem; font-size: 0.875rem;">
+                            ℹ️ Les articles restent dans la corbeille jusqu'à ce que vous la vidiez. Maximum 50 articles.
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+        }
+
         function renderHistoryView() {
             return `
                 <div class="card">
                     <div class="card-title">Historique des courses</div>
+                    
                     ${state.history.length === 0 ? `
                         <div class="empty-state">
                             <div style="font-size: 3rem; margin-bottom: 1rem;">📚</div>
@@ -819,25 +954,11 @@
                     </div>
                     <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.75rem;">
                         ${state.categories.map(cat => `
-                            <div style="padding: 1rem; background: ${state.darkMode ? '#374151' : '#f9fafb'}; border-radius: 0.5rem; position: relative;">
-                                <div style="text-align: center;">
-                                    <div style="font-size: 2rem; margin-bottom: 0.5rem;">🏷️</div>
-                                    <div style="font-weight: 600; margin-bottom: 0.25rem;">${escapeHtml(cat)}</div>
-                                    <div style="font-size: 0.75rem; color: #6b7280;">
-                                        ${state.items.filter(i => i.category === cat).length} articles
-                                    </div>
-                                </div>
-                                <div style="display: flex; gap: 0.25rem; margin-top: 0.5rem; justify-content: center;">
-                                    <button onclick="openEditCategoryModal('${escapeAttr(cat)}')" 
-                                            style="padding: 0.25rem 0.5rem; background: #3b82f6; color: white; border: none; border-radius: 0.25rem; font-size: 0.75rem; cursor: pointer;">
-                                        ✏️ Modifier
-                                    </button>
-                                    ${cat !== 'Autres' ? `
-                                        <button onclick="deleteCategory('${escapeAttr(cat)}')" 
-                                                style="padding: 0.25rem 0.5rem; background: #ef4444; color: white; border: none; border-radius: 0.25rem; font-size: 0.75rem; cursor: pointer;">
-                                            🗑️
-                                        </button>
-                                    ` : ''}
+                            <div style="padding: 1rem; background: ${state.darkMode ? '#374151' : '#f9fafb'}; border-radius: 0.5rem; text-align: center;">
+                                <div style="font-size: 2rem; margin-bottom: 0.5rem;">🏷️</div>
+                                <div style="font-weight: 600; margin-bottom: 0.25rem;">${escapeHtml(cat)}</div>
+                                <div style="font-size: 0.75rem; color: #6b7280;">
+                                    ${state.items.filter(i => i.category === cat).length} articles
                                 </div>
                             </div>
                         `).join('')}
@@ -855,72 +976,25 @@
         function renderFavoritesView() {
             return `
                 <div class="card">
-                    <div class="card-title">Favoris</div>
+                    <div class="card-title">Articles favoris</div>
                     ${state.favorites.length === 0 ? `
                         <div class="empty-state">
                             <div style="font-size: 3rem; margin-bottom: 1rem;">⭐</div>
                             <div style="font-size: 1.125rem;">Aucun favori</div>
+                            <div style="font-size: 0.875rem; margin-top: 0.5rem;">
+                                Ajoutez des articles fréquents à vos favoris pour un accès rapide
+                            </div>
                         </div>
                     ` : state.favorites.map(fav => `
                         <div class="item">
-                            <div style="flex: 1;">⭐ ${fav}</div>
-                            <button class="btn btn-primary" onclick="addItem('${fav}')">
-                                Ajouter
+                            <div style="flex: 1;">⭐ ${escapeHtml(fav)}</div>
+                            <button class="btn btn-primary" onclick="addItem('${escapeAttr(fav)}')" style="padding: 0.5rem 1rem; font-size: 0.875rem;">
+                                + Ajouter
                             </button>
                         </div>
                     `).join('')}
                 </div>
             `;
-        }
-
-        function renderSettingsView() {
-            return `
-                <div class="card">
-                    <div class="card-title">Export / Import</div>
-                    <button class="btn btn-primary" onclick="exportData()" style="width: 100%; margin-bottom: 0.5rem;">
-                        💾 Exporter la liste
-                    </button>
-                    <label class="btn btn-primary" style="width: 100%; display: block; text-align: center; cursor: pointer;">
-                        📁 Importer une liste
-                        <input type="file" accept=".json" onchange="importData(event)" style="display: none;">
-                    </label>
-                </div>
-
-                <div class="card">
-                    <div class="card-title">Mode sombre</div>
-                    <div class="flex items-center justify-between">
-                        <span>Thème sombre</span>
-                        <button class="btn ${state.darkMode ? 'btn-primary' : ''}" 
-                                onclick="toggleDarkMode()"
-                                style="padding: 0.5rem 1rem;">
-                            ${state.darkMode ? 'Activé' : 'Désactivé'}
-                        </button>
-                    </div>
-                </div>
-
-                <div class="card">
-                    <div class="card-title">Debug & Maintenance</div>
-                    <div style="margin-bottom: 1rem; padding: 0.75rem; background: ${state.darkMode ? '#374151' : '#f3f4f6'}; border-radius: 0.5rem; font-size: 0.875rem;">
-                        <div><strong>Articles en mémoire:</strong> ${state.items.length}</div>
-                        <div><strong>Catégories:</strong> ${state.categories.length}</div>
-                        <div><strong>Historique:</strong> ${state.history.length} listes</div>
-                    </div>
-                    <button class="btn btn-danger" onclick="if(confirm('Effacer toutes les données?'))clearAllData()" style="width: 100%;">
-                        🗑️ Réinitialiser l'application
-                    </button>
-                </div>
-            `;
-        }
-
-        function clearAllData() {
-            localStorage.removeItem('smartListData');
-            state.items = [];
-            state.categories = ['Fruits & Légumes', 'Viande & Poisson', 'Produits laitiers', 'Épicerie', 'Hygiène', 'Autres'];
-            state.history = [];
-            state.favorites = [];
-            state.shareCode = '';
-            showNotification('Application réinitialisée');
-            render();
         }
 
         function renderShareView() {
@@ -976,218 +1050,44 @@
         }
 
         function joinSharedList() {
-            const code = document.getElementById('joinCode').value.trim().toUpperCase();
+            const code = document.getElementById('joinCode')?.value.trim().toUpperCase();
             if (!code) {
                 showNotification('Veuillez entrer un code');
                 return;
             }
-            
-            // Simulation - dans une vraie app, cela contacterait un serveur
             showNotification('Fonctionnalité disponible avec synchronisation serveur');
         }
 
-        function addNewCategory() {
-            if (!state.newCategory.trim()) {
-                showNotification('Entrez un nom de catégorie');
-                return;
-            }
-            
-            if (state.categories.includes(state.newCategory.trim())) {
-                showNotification('Cette catégorie existe déjà');
-                return;
-            }
-            
-            state.categories.push(state.newCategory.trim());
-            state.newCategory = '';
-            state.showCategoryModal = false;
-            saveData();
-            showNotification('Catégorie ajoutée');
-            render();
-        }
+        function renderSettingsView() {
+            return `
+                <div class="card">
+                    <div class="card-title">Mode sombre</div>
+                    <div class="flex items-center justify-between">
+                        <span>Thème sombre</span>
+                        <button class="btn ${state.darkMode ? 'btn-primary' : ''}" 
+                                onclick="toggleDarkMode()"
+                                style="padding: 0.5rem 1rem;">
+                            ${state.darkMode ? 'Activé' : 'Désactivé'}
+                        </button>
+                    </div>
+                </div>
 
-        function openEditItemModal(id) {
-            state.editingItem = state.items.find(i => i.id === id);
-            state.showEditItemModal = true;
-            render();
-        }
-
-        function updateItem() {
-            if (!state.editingItem) return;
-            
-            const nameInput = document.getElementById('editItemName');
-            const categorySelect = document.getElementById('editItemCategory');
-            
-            if (!nameInput || !categorySelect) return;
-            
-            const item = state.items.find(i => i.id === state.editingItem.id);
-            if (item) {
-                item.name = nameInput.value.trim();
-                item.category = categorySelect.value;
-                saveData();
-                showNotification('Article modifié');
-            }
-            
-            state.showEditItemModal = false;
-            state.editingItem = null;
-            render();
-        }
-
-        function openEditCategoryModal(category) {
-            state.editingCategory = category;
-            state.editCategoryNewName = category;
-            state.showEditCategoryModal = true;
-            render();
-        }
-
-        function updateCategory() {
-            if (!state.editingCategory || !state.editCategoryNewName.trim()) {
-                showNotification('Entrez un nom de catégorie');
-                return;
-            }
-            
-            const newName = state.editCategoryNewName.trim();
-            const oldName = state.editingCategory;
-            
-            if (newName !== oldName && state.categories.includes(newName)) {
-                showNotification('Cette catégorie existe déjà');
-                return;
-            }
-            
-            // Mettre à jour le nom de la catégorie
-            const index = state.categories.indexOf(oldName);
-            if (index !== -1) {
-                state.categories[index] = newName;
-            }
-            
-            // Mettre à jour tous les articles avec cette catégorie
-            state.items.forEach(item => {
-                if (item.category === oldName) {
-                    item.category = newName;
-                }
-            });
-            
-            state.showEditCategoryModal = false;
-            state.editingCategory = null;
-            state.editCategoryNewName = '';
-            saveData();
-            showNotification('Catégorie modifiée');
-            render();
-        }
-
-        function deleteCategory(category) {
-            if (category === 'Autres') {
-                showNotification('Impossible de supprimer la catégorie "Autres"');
-                return;
-            }
-            
-            if (!confirm(`Supprimer la catégorie "${category}"?\nLes articles seront déplacés vers "Autres".`)) {
-                return;
-            }
-            
-            // Déplacer les articles vers "Autres"
-            state.items.forEach(item => {
-                if (item.category === category) {
-                    item.category = 'Autres';
-                }
-            });
-            
-            // Supprimer la catégorie
-            state.categories = state.categories.filter(c => c !== category);
-            
-            saveData();
-            showNotification('Catégorie supprimée');
-            render();
+                <div class="card">
+                    <div class="card-title">Debug & Maintenance</div>
+                    <div style="margin-bottom: 1rem; padding: 0.75rem; background: ${state.darkMode ? '#374151' : '#f3f4f6'}; border-radius: 0.5rem; font-size: 0.875rem;">
+                        <div><strong>Articles en mémoire:</strong> ${state.items.length}</div>
+                        <div><strong>Corbeille:</strong> ${state.trash.length} articles</div>
+                        <div><strong>Catégories:</strong> ${state.categories.length}</div>
+                        <div><strong>Historique:</strong> ${state.history.length} listes</div>
+                    </div>
+                </div>
+            `;
         }
 
         function renderNotifications() {
             return state.notifications.map(n => `
-                <div class="notification">${n.message}</div>
+                <div class="notification">${escapeHtml(n.message)}</div>
             `).join('');
-        }
-
-        // Export/Import
-        function exportData() {
-            try {
-                const data = JSON.stringify({
-                    items: state.items,
-                    categories: state.categories,
-                    favorites: state.favorites,
-                    exportDate: new Date().toISOString()
-                }, null, 2);
-                
-                const blob = new Blob([data], { type: 'application/json' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `smartlist_${new Date().toISOString().split('T')[0]}.json`;
-                a.click();
-                URL.revokeObjectURL(url);
-                
-                showNotification('Liste exportée');
-            } catch (e) {
-                showNotification('Erreur export');
-            }
-        }
-
-        function importData(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-            
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                try {
-                    const data = JSON.parse(e.target.result);
-                    if (data.items) state.items = [...state.items, ...data.items];
-                    if (data.categories) state.categories = [...new Set([...state.categories, ...data.categories])];
-                    if (data.favorites) state.favorites = [...new Set([...state.favorites, ...data.favorites])];
-                    saveData();
-                    showNotification('Liste importée');
-                    render();
-                } catch (e) {
-                    showNotification('Erreur import');
-                }
-            };
-            reader.readAsText(file);
-        }
-
-        // Main render
-        function render() {
-            const app = document.getElementById('app');
-            
-            if (state.showSplash) {
-                app.innerHTML = `
-                    <div class="splash">
-                        <div class="splash-content">
-                            <div class="splash-logo">🛒</div>
-                            <h1 style="font-size: 2rem; font-weight: bold; margin-bottom: 0.5rem;">SmartList</h1>
-                            <p style="font-size: 1.125rem; opacity: 0.9;">Votre assistant courses intelligent</p>
-                        </div>
-                    </div>
-                `;
-                return;
-            }
-            
-            let content = '';
-            switch (state.currentView) {
-                case 'home': content = renderHomeView(); break;
-                case 'history': content = renderHistoryView(); break;
-                case 'categories': content = renderCategoriesView(); break;
-                case 'favorites': content = renderFavoritesView(); break;
-                case 'share': content = renderShareView(); break;
-                case 'settings': content = renderSettingsView(); break;
-            }
-            
-            app.innerHTML = `
-                ${renderHeader()}
-                <div class="main">
-                    ${content}
-                </div>
-                ${renderNotifications()}
-                ${state.isListening ? '<div class="voice-indicator">🎤</div>' : ''}
-                ${state.showCategoryModal ? renderCategoryModal() : ''}
-                ${state.showEditItemModal ? renderEditItemModal() : ''}
-                ${state.showEditCategoryModal ? renderEditCategoryModal() : ''}
-            `;
         }
 
         function renderCategoryModal() {
@@ -1264,42 +1164,43 @@
             `;
         }
 
-        function renderEditCategoryModal() {
-            if (!state.editingCategory) return '';
+        // Main render
+        function render() {
+            const app = document.getElementById('app');
             
-            return `
-                <div class="modal" onclick="if(event.target===this){state.showEditCategoryModal=false;state.editingCategory=null;render();}">
-                    <div class="modal-content">
-                        <div class="card-title">Modifier la catégorie</div>
-                        
-                        <div style="margin-bottom: 1rem;">
-                            <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Nouveau nom:</label>
-                            <input type="text" 
-                                   class="input" 
-                                   value="${escapeAttr(state.editCategoryNewName)}"
-                                   oninput="state.editCategoryNewName=this.value"
-                                   onkeypress="if(event.key==='Enter')updateCategory()"
-                                   placeholder="Nom de la catégorie...">
-                        </div>
-                        
-                        <div style="padding: 0.75rem; background: ${state.darkMode ? '#1e3a8a' : '#dbeafe'}; border-radius: 0.5rem; margin-bottom: 1rem; font-size: 0.875rem;">
-                            ℹ️ Les articles de cette catégorie seront automatiquement mis à jour.
-                        </div>
-                        
-                        <div class="flex gap-2">
-                            <button class="btn" 
-                                    onclick="state.showEditCategoryModal=false; state.editingCategory=null; render();"
-                                    style="flex: 1; background: #e5e7eb;">
-                                Annuler
-                            </button>
-                            <button class="btn btn-primary" 
-                                    onclick="updateCategory()"
-                                    style="flex: 1;">
-                                Enregistrer
-                            </button>
+            if (state.showSplash) {
+                app.innerHTML = `
+                    <div class="splash">
+                        <div class="splash-content">
+                            <div class="splash-logo">🛒</div>
+                            <h1 style="font-size: 2rem; font-weight: bold; margin-bottom: 0.5rem;">SmartList</h1>
+                            <p style="font-size: 1.125rem; opacity: 0.9;">Votre assistant courses intelligent</p>
                         </div>
                     </div>
+                `;
+                return;
+            }
+            
+            let content = '';
+            switch (state.currentView) {
+                case 'home': content = renderHomeView(); break;
+                case 'trash': content = renderTrashView(); break;
+                case 'history': content = renderHistoryView(); break;
+                case 'categories': content = renderCategoriesView(); break;
+                case 'favorites': content = renderFavoritesView(); break;
+                case 'share': content = renderShareView(); break;
+                case 'settings': content = renderSettingsView(); break;
+            }
+            
+            app.innerHTML = `
+                ${renderHeader()}
+                <div class="main">
+                    ${content}
                 </div>
+                ${renderNotifications()}
+                ${state.isListening ? '<div class="voice-indicator">🎤</div>' : ''}
+                ${state.showCategoryModal ? renderCategoryModal() : ''}
+                ${state.showEditItemModal ? renderEditItemModal() : ''}
             `;
         }
 
