@@ -6,6 +6,11 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <title>SmartList - Assistant Courses</title>
+    
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+    
     <style>
         * {
             margin: 0;
@@ -407,6 +412,30 @@
     <div id="app"></div>
 
     <script>
+        // Firebase Configuration
+        const firebaseConfig = {
+    apiKey: "AIzaSyDemoKey-ReplaceWithYourOwnKey",
+    authDomain: "smartlist-demo.firebaseapp.com",
+    databaseURL: "https://smartlist-demo-default-rtdb.firebaseio.com",
+    projectId: "smartlist-demo",
+    storageBucket: "smartlist-demo.appspot.com",
+    messagingSenderId: "123456789",
+    appId: "1:123456789:web:abcdef123456"
+        };
+
+        // Initialize Firebase
+        let firebaseApp = null;
+        let database = null;
+        let currentListRef = null;
+        
+        try {
+            firebaseApp = firebase.initializeApp(firebaseConfig);
+            database = firebase.database();
+            console.log('Firebase initialisé');
+        } catch (error) {
+            console.warn('Firebase non disponible (mode démo):', error.message);
+        }
+
         // App state
         const state = {
             showSplash: true,
@@ -509,6 +538,12 @@
             state.items.push(item);
             state.newItem = '';
             saveData();
+            
+            // Sync to Firebase if sharing
+            if (currentListRef) {
+                syncToFirebase();
+            }
+            
             showNotification(`"${escapeHtml(name)}" ajouté dans ${item.category}`);
             render();
         }
@@ -519,8 +554,28 @@
             if (item) {
                 item.completed = !item.completed;
                 saveData();
+                
+                // Sync to Firebase if sharing
+                if (currentListRef) {
+                    syncToFirebase();
+                }
+                
                 render();
             }
+        }
+
+        // Toggle favorite
+        function toggleFavorite(itemName) {
+            const lowerName = itemName.toLowerCase();
+            if (state.favorites.includes(lowerName)) {
+                state.favorites = state.favorites.filter(f => f !== lowerName);
+                showNotification(`"${escapeHtml(itemName)}" retiré des favoris`);
+            } else {
+                state.favorites.push(lowerName);
+                showNotification(`"${escapeHtml(itemName)}" ajouté aux favoris`);
+            }
+            saveData();
+            render();
         }
 
         // Remove item (move to trash)
@@ -534,6 +589,12 @@
                 state.trash = state.trash.slice(-50);
                 state.items = state.items.filter(i => i.id !== id);
                 saveData();
+                
+                // Sync to Firebase if sharing
+                if (currentListRef) {
+                    syncToFirebase();
+                }
+                
                 showNotification(`"${escapeHtml(item.name)}" dans la corbeille`);
                 render();
             }
@@ -594,19 +655,24 @@
 
         // Save to history
         function saveToHistory() {
-            if (state.items.length === 0) return;
+            if (state.items.length === 0) {
+                showNotification('Aucun article à sauvegarder');
+                return;
+            }
             
-            state.history.unshift({
+            const historyItem = {
                 id: Date.now(),
                 date: new Date().toISOString(),
                 items: [...state.items],
                 total: state.items.length
-            });
+            };
             
+            state.history.unshift(historyItem);
             state.history = state.history.slice(0, 10);
             state.items = [];
+            
             saveData();
-            showNotification('Liste sauvegardée dans l\'historique');
+            showNotification(`Liste sauvegardée dans l'historique (${historyItem.total} articles)`);
             render();
         }
 
@@ -856,6 +922,11 @@
                                                 📁 ${escapeHtml(item.category)}
                                             </div>
                                         </div>
+                                        <button class="btn btn-icon" 
+                                                onclick="event.stopPropagation(); toggleFavorite('${escapeAttr(item.name)}')"
+                                                style="width: 32px; height: 32px; background: none; border: none; cursor: pointer;">
+                                            ${state.favorites.includes(item.name.toLowerCase()) ? '⭐' : '☆'}
+                                        </button>
                                         <button class="btn btn-icon btn-danger" 
                                                 onclick="removeItem(${item.id})"
                                                 style="width: 32px; height: 32px; font-size: 1rem;">
@@ -921,21 +992,34 @@
                     ${state.history.length === 0 ? `
                         <div class="empty-state">
                             <div style="font-size: 3rem; margin-bottom: 1rem;">📚</div>
-                            <div style="font-size: 1.125rem;">Aucun historique</div>
+                            <div style="font-size: 1.125rem; margin-bottom: 0.5rem;">Aucun historique</div>
+                            <div style="font-size: 0.875rem;">
+                                Les listes terminées apparaîtront ici.<br>
+                                Cliquez sur "✓ Terminer" dans l'accueil pour sauvegarder.
+                            </div>
                         </div>
                     ` : state.history.map(record => `
-                        <div class="item">
-                            <div style="flex: 1;">
-                                <div style="font-weight: 600; margin-bottom: 0.25rem;">
+                        <div style="padding: 1rem; background: ${state.darkMode ? '#374151' : '#f9fafb'}; border-radius: 0.5rem; margin-bottom: 1rem;">
+                            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 0.5rem;">
+                                <div style="font-weight: 600;">
                                     ${new Date(record.date).toLocaleDateString('fr-FR', {
+                                        weekday: 'short',
                                         day: '2-digit',
                                         month: '2-digit',
-                                        year: 'numeric'
+                                        year: 'numeric',
+                                        hour: '2-digit',
+                                        minute: '2-digit'
                                     })}
                                 </div>
-                                <div style="font-size: 0.875rem; color: #6b7280;">
+                                <div style="font-size: 0.875rem; padding: 0.25rem 0.5rem; background: ${state.darkMode ? '#1f2937' : 'white'}; border-radius: 0.25rem;">
                                     ${record.total} articles
                                 </div>
+                            </div>
+                            <div style="font-size: 0.875rem; color: #6b7280; margin-top: 0.5rem;">
+                                ${record.items.slice(0, 5).map(item => 
+                                    `<div style="padding: 0.25rem 0;">• ${escapeHtml(item.name)} <span style="opacity: 0.6;">(${escapeHtml(item.category)})</span></div>`
+                                ).join('')}
+                                ${record.items.length > 5 ? `<div style="padding: 0.25rem 0; font-style: italic;">... et ${record.items.length - 5} autres</div>` : ''}
                             </div>
                         </div>
                     `).join('')}
@@ -1000,8 +1084,18 @@
         function renderShareView() {
             return `
                 <div class="card">
-                    <div class="card-title">Partager ma liste</div>
-                    <button class="btn btn-primary" onclick="generateShareCode()" style="width: 100%; margin-bottom: 1rem;">
+                    <div class="card-title">Partager ma liste en temps réel</div>
+                    
+                    ${!database ? `
+                        <div style="padding: 1rem; background: ${state.darkMode ? '#7f1d1d' : '#fee2e2'}; border-radius: 0.5rem; margin-bottom: 1rem;">
+                            <div style="font-weight: 600; margin-bottom: 0.5rem; color: #991b1b;">⚠️ Mode démo</div>
+                            <div style="font-size: 0.875rem; color: #7f1d1d;">
+                                Pour activer le partage en temps réel, configurez Firebase dans le code source.
+                            </div>
+                        </div>
+                    ` : ''}
+                    
+                    <button class="btn btn-primary" onclick="generateShareCode()" style="width: 100%; margin-bottom: 1rem;" ${!database ? 'disabled' : ''}>
                         🔗 Générer un code de partage
                     </button>
                     
@@ -1012,30 +1106,37 @@
                                 ${state.shareCode}
                             </div>
                             <div style="font-size: 0.875rem; color: #6b7280; margin-top: 0.5rem; text-align: center;">
-                                Partagez ce code pour donner accès à votre liste
+                                Partagez ce code pour collaborer sur cette liste
                             </div>
+                            ${database ? `
+                                <button class="btn btn-danger" onclick="stopSharing()" style="width: 100%; margin-top: 1rem; font-size: 0.875rem;">
+                                    🔒 Arrêter le partage
+                                </button>
+                            ` : ''}
                         </div>
                     ` : ''}
                     
                     <div style="border-top: 1px solid ${state.darkMode ? '#374151' : '#e5e7eb'}; padding-top: 1rem; margin-top: 1rem;">
-                        <div style="font-weight: 600; margin-bottom: 0.5rem;">Rejoindre une liste</div>
+                        <div style="font-weight: 600; margin-bottom: 0.5rem;">Rejoindre une liste partagée</div>
                         <div class="input-group">
                             <input type="text" 
                                    class="input" 
                                    placeholder="Entrez un code..." 
                                    id="joinCode">
-                            <button class="btn btn-success" onclick="joinSharedList()">
+                            <button class="btn btn-success" onclick="joinSharedList()" ${!database ? 'disabled' : ''}>
                                 Rejoindre
                             </button>
                         </div>
                     </div>
                     
                     <div style="padding: 1rem; background: ${state.darkMode ? '#1e3a8a' : '#dbeafe'}; border-radius: 0.5rem; margin-top: 1rem;">
-                        <div style="font-weight: 600; margin-bottom: 0.5rem;">ℹ️ Comment ça marche ?</div>
+                        <div style="font-weight: 600; margin-bottom: 0.5rem;">✨ Partage en temps réel</div>
                         <ul style="font-size: 0.875rem; color: ${state.darkMode ? '#bfdbfe' : '#1e40af'}; padding-left: 1.5rem;">
-                            <li>Générez un code pour partager votre liste</li>
-                            <li>La personne peut consulter votre liste avec ce code</li>
-                            <li>Le code reste valide jusqu'à ce que vous en génériez un nouveau</li>
+                            <li>Générez un code unique pour votre liste</li>
+                            <li>Partagez-le avec vos proches</li>
+                            <li>Les modifications sont synchronisées instantanément</li>
+                            <li>Fonctionne sans installer l'application</li>
+                            <li>Plusieurs personnes peuvent modifier en même temps</li>
                         </ul>
                     </div>
                 </div>
@@ -1043,23 +1144,146 @@
         }
 
         function generateShareCode() {
-            state.shareCode = Math.random().toString(36).substring(2, 8).toUpperCase();
-            saveData();
-            showNotification(`Code généré: ${state.shareCode}`);
-            render();
+            if (!database) {
+                showNotification('Firebase non configuré - Mode démo uniquement');
+                return;
+            }
+            
+            // Générer un code unique
+            const code = Math.random().toString(36).substring(2, 8).toUpperCase();
+            state.shareCode = code;
+            
+            // Créer la référence Firebase pour cette liste
+            currentListRef = database.ref('lists/' + code);
+            
+            // Sauvegarder les données initiales
+            currentListRef.set({
+                items: state.items,
+                categories: state.categories,
+                createdAt: firebase.database.ServerValue.TIMESTAMP,
+                lastUpdate: firebase.database.ServerValue.TIMESTAMP
+            }).then(() => {
+                // Écouter les changements en temps réel
+                setupRealtimeSync(code);
+                saveData();
+                showNotification(`Code de partage créé: ${code}`);
+                render();
+            }).catch(error => {
+                console.error('Erreur création liste:', error);
+                showNotification('Erreur lors de la création du partage');
+            });
+        }
+
+        function setupRealtimeSync(code) {
+            if (!database || !currentListRef) return;
+            
+            // Écouter les changements d'items
+            currentListRef.child('items').on('value', (snapshot) => {
+                const remoteItems = snapshot.val();
+                if (remoteItems && JSON.stringify(remoteItems) !== JSON.stringify(state.items)) {
+                    state.items = remoteItems;
+                    saveData();
+                    render();
+                }
+            });
+            
+            // Écouter les changements de catégories
+            currentListRef.child('categories').on('value', (snapshot) => {
+                const remoteCategories = snapshot.val();
+                if (remoteCategories && JSON.stringify(remoteCategories) !== JSON.stringify(state.categories)) {
+                    state.categories = remoteCategories;
+                    saveData();
+                    render();
+                }
+            });
+        }
+
+        function syncToFirebase() {
+            if (!database || !currentListRef) return;
+            
+            currentListRef.update({
+                items: state.items,
+                categories: state.categories,
+                lastUpdate: firebase.database.ServerValue.TIMESTAMP
+            }).catch(error => {
+                console.error('Erreur sync:', error);
+            });
         }
 
         function joinSharedList() {
+            if (!database) {
+                showNotification('Firebase non configuré - Mode démo uniquement');
+                return;
+            }
+            
             const code = document.getElementById('joinCode')?.value.trim().toUpperCase();
             if (!code) {
                 showNotification('Veuillez entrer un code');
                 return;
             }
-            showNotification('Fonctionnalité disponible avec synchronisation serveur');
+            
+            const listRef = database.ref('lists/' + code);
+            
+            listRef.once('value').then((snapshot) => {
+                if (snapshot.exists()) {
+                    const sharedData = snapshot.val();
+                    
+                    // Demander confirmation avant de remplacer
+                    if (state.items.length > 0) {
+                        if (!confirm('Voulez-vous remplacer votre liste actuelle par la liste partagée ?')) {
+                            return;
+                        }
+                    }
+                    
+                    state.items = sharedData.items || [];
+                    state.categories = sharedData.categories || state.categories;
+                    state.shareCode = code;
+                    currentListRef = listRef;
+                    
+                    setupRealtimeSync(code);
+                    saveData();
+                    showNotification(`Connecté à la liste ${code}`);
+                    changeView('home');
+                    render();
+                } else {
+                    showNotification('Code invalide ou liste expirée');
+                }
+            }).catch(error => {
+                console.error('Erreur rejoindre liste:', error);
+                showNotification('Erreur lors de la connexion');
+            });
+        }
+
+        function stopSharing() {
+            if (!currentListRef) return;
+            
+            if (confirm('Arrêter le partage de cette liste ?')) {
+                currentListRef.off();
+                currentListRef = null;
+                state.shareCode = '';
+                saveData();
+                showNotification('Partage arrêté');
+                render();
+            }
         }
 
         function renderSettingsView() {
             return `
+                <div class="card">
+                    <div class="card-title">Export / Import</div>
+                    <button class="btn btn-primary" onclick="exportData()" style="width: 100%; margin-bottom: 0.5rem;">
+                        💾 Exporter la liste
+                    </button>
+                    <label class="btn btn-primary" style="width: 100%; display: block; text-align: center; cursor: pointer; margin-bottom: 1rem;">
+                        📁 Importer une liste
+                        <input type="file" accept=".json" onchange="importData(event)" style="display: none;">
+                    </label>
+                    <div style="padding: 0.75rem; background: ${state.darkMode ? '#1e3a8a' : '#dbeafe'}; border-radius: 0.5rem; font-size: 0.875rem;">
+                        ℹ️ Export : Télécharge vos données en JSON<br>
+                        Import : Fusionne avec vos données existantes
+                    </div>
+                </div>
+
                 <div class="card">
                     <div class="card-title">Mode sombre</div>
                     <div class="flex items-center justify-between">
@@ -1082,6 +1306,75 @@
                     </div>
                 </div>
             `;
+        }
+
+        // Export/Import functions
+        function exportData() {
+            try {
+                const dataToExport = {
+                    items: state.items,
+                    categories: state.categories,
+                    favorites: state.favorites,
+                    history: state.history,
+                    exportDate: new Date().toISOString(),
+                    appVersion: '1.0'
+                };
+                
+                const jsonString = JSON.stringify(dataToExport, null, 2);
+                const blob = new Blob([jsonString], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `smartlist_${new Date().toISOString().split('T')[0]}.json`;
+                document.body.appendChild(a);
+                a.click();
+                
+                // Cleanup
+                setTimeout(() => {
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                }, 100);
+                
+                showNotification('Liste exportée avec succès');
+            } catch (error) {
+                console.error('Erreur export:', error);
+                showNotification('Erreur lors de l\'export');
+            }
+        }
+
+        function importData(event) {
+            const file = event.target.files && event.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const importedData = JSON.parse(e.target.result);
+                    
+                    if (importedData.items) {
+                        state.items = [...state.items, ...importedData.items];
+                    }
+                    if (importedData.categories) {
+                        state.categories = [...new Set([...state.categories, ...importedData.categories])];
+                    }
+                    if (importedData.favorites) {
+                        state.favorites = [...new Set([...state.favorites, ...importedData.favorites])];
+                    }
+                    if (importedData.history) {
+                        state.history = [...importedData.history, ...state.history];
+                    }
+                    
+                    saveData();
+                    showNotification('Liste importée avec succès');
+                    render();
+                } catch (error) {
+                    console.error('Erreur import:', error);
+                    showNotification('Erreur lors de l\'importation');
+                }
+            };
+            reader.readAsText(file);
+            event.target.value = '';
         }
 
         function renderNotifications() {
