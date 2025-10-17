@@ -414,13 +414,13 @@
     <script>
         // Firebase Configuration
         const firebaseConfig = {
-  apiKey: "AIzaSyBEPVQ_rHBUSaaSTTGTJGac7ymi-HkPICY",
-  authDomain: "smartlist-1b5f7.firebaseapp.com",
-  databaseURL: "https://smartlist-1b5f7-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "smartlist-1b5f7",
-  storageBucket: "smartlist-1b5f7.firebasestorage.app",
-  messagingSenderId: "683797827207",
-  appId: "1:683797827207:web:ef034d6018f6bdb2993222"
+            apiKey: "AIzaSyDemoKey-ReplaceWithYourOwnKey",
+            authDomain: "smartlist-demo.firebaseapp.com",
+            databaseURL: "https://smartlist-demo-default-rtdb.firebaseio.com",
+            projectId: "smartlist-demo",
+            storageBucket: "smartlist-demo.appspot.com",
+            messagingSenderId: "123456789",
+            appId: "1:123456789:web:abcdef123456"
         };
 
         // Initialize Firebase
@@ -453,7 +453,8 @@
             showEditItemModal: false,
             newCategory: '',
             shareCode: '',
-            editingItem: null
+            editingItem: null,
+            isSyncing: false
         };
 
         // Item database for auto-categorization
@@ -765,6 +766,12 @@
                 item.name = nameInput.value.trim();
                 item.category = categorySelect.value;
                 saveData();
+                
+                // Sync to Firebase if sharing
+                if (currentListRef) {
+                    syncToFirebase();
+                }
+                
                 showNotification('Article modifié');
             }
             
@@ -789,6 +796,12 @@
             state.newCategory = '';
             state.showCategoryModal = false;
             saveData();
+            
+            // Sync to Firebase if sharing
+            if (currentListRef) {
+                syncToFirebase();
+            }
+            
             showNotification('Catégorie ajoutée');
             render();
         }
@@ -1177,36 +1190,63 @@
         function setupRealtimeSync(code) {
             if (!database || !currentListRef) return;
             
+            let isUpdatingFromRemote = false;
+            
             // Écouter les changements d'items
             currentListRef.child('items').on('value', (snapshot) => {
                 const remoteItems = snapshot.val();
-                if (remoteItems && JSON.stringify(remoteItems) !== JSON.stringify(state.items)) {
-                    state.items = remoteItems;
-                    saveData();
-                    render();
+                if (remoteItems && !isUpdatingFromRemote) {
+                    // Comparer pour éviter les boucles infinies
+                    const remoteStr = JSON.stringify(remoteItems);
+                    const localStr = JSON.stringify(state.items);
+                    
+                    if (remoteStr !== localStr) {
+                        isUpdatingFromRemote = true;
+                        state.items = remoteItems;
+                        saveData();
+                        render();
+                        setTimeout(() => { isUpdatingFromRemote = false; }, 100);
+                    }
                 }
             });
             
             // Écouter les changements de catégories
             currentListRef.child('categories').on('value', (snapshot) => {
                 const remoteCategories = snapshot.val();
-                if (remoteCategories && JSON.stringify(remoteCategories) !== JSON.stringify(state.categories)) {
-                    state.categories = remoteCategories;
-                    saveData();
-                    render();
+                if (remoteCategories && !isUpdatingFromRemote) {
+                    const remoteStr = JSON.stringify(remoteCategories);
+                    const localStr = JSON.stringify(state.categories);
+                    
+                    if (remoteStr !== localStr) {
+                        isUpdatingFromRemote = true;
+                        state.categories = remoteCategories;
+                        saveData();
+                        render();
+                        setTimeout(() => { isUpdatingFromRemote = false; }, 100);
+                    }
                 }
             });
+            
+            console.log('Synchronisation en temps réel activée pour:', code);
         }
 
         function syncToFirebase() {
-            if (!database || !currentListRef) return;
+            if (!database || !currentListRef) {
+                console.warn('Firebase non disponible pour la synchronisation');
+                return;
+            }
+            
+            console.log('Synchronisation vers Firebase...');
             
             currentListRef.update({
                 items: state.items,
                 categories: state.categories,
                 lastUpdate: firebase.database.ServerValue.TIMESTAMP
+            }).then(() => {
+                console.log('Synchronisation réussie');
             }).catch(error => {
                 console.error('Erreur sync:', error);
+                showNotification('Erreur de synchronisation');
             });
         }
 
